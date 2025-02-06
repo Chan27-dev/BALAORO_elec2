@@ -39,16 +39,19 @@ df = df.withColumn(
     when(rand() < 0.5, "Partition_1").otherwise("Partition_2")
 )
 
-name_partitioned_df = df.repartition(2, "partition_category") 
+# Repartition correctly
+name_partitioned_df = df.repartition(2, col("partition_category"))
 
+# Verify partition count
 print(f"Number of partitions (name): {name_partitioned_df.rdd.getNumPartitions()}")
-for i in range(name_partitioned_df.rdd.getNumPartitions()):
-    print(f"Partition {i}:")
-    # Get data for the current partition as a DataFrame
-    partition_data = name_partitioned_df.rdd.mapPartitionsWithIndex(lambda index, it: it if index == i else [])
-    # Create a DataFrame from the partition data
-    partition_df = spark.createDataFrame(partition_data, df.schema)
+
+# Process partitions correctly
+for partition_value in ["Partition_1", "Partition_2"]:
+    print(f"\nPartition: {partition_value}")
+    
+    # Filter data for the current partition
+    partition_df = name_partitioned_df.filter(col("partition_category") == partition_value)
+    
     # TRANSFORMATION PIPELINE
-    # Now you can use groupBy on the DataFrame
     partition_df.groupBy("mfr").max("calories").show()
     partition_df.groupBy("mfr").avg("rating").show()
