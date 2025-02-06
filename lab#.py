@@ -1,7 +1,6 @@
-
 # SHOW DATASETS
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, avg, upper, substring, rand
 import os
 
 spark = SparkSession.builder.appName("Cereal").getOrCreate()
@@ -22,34 +21,34 @@ print(f"Number of partitions (Range): {range_partitioned_df.rdd.getNumPartitions
 
 for i in range(range_partitioned_df.rdd.getNumPartitions()):
     print(f"Partition {i}:")
-    partition_data = range_partitioned_df.rdd.mapPartitionsWithIndex(lambda index, it: it if index == i else []).collect()
+    # Get data for the current partition as a DataFrame
+    partition_data = range_partitioned_df.rdd.mapPartitionsWithIndex(lambda index, it: it if index == i else [])
+    # Create a DataFrame from the partition data
+    partition_df = spark.createDataFrame(partition_data, df.schema) 
     # TRANSFORMATION PIPELINE
-    partition_data.groupBy("mfr").avg("rating").show()
+    # Now you can use groupBy on the DataFrame
+    partition_df.groupBy("mfr").max("sugars").show() 
 
-    # for row in partition_data:
-    #     print(row) 
-        
-# PARTITIONING STRATEGY #2: CUSTOM PARTIONING
+# PARTITIONING STRATEGY #2: CUSTOM PARTITIONING
 
 print("Partition 2: Custom Partitioning")
+from pyspark.sql.functions import when
+
 df = df.withColumn(
-    "sugar_category",
-    when(df["sugars"] < 5, "Low Sugar")
-    .when((df["sugars"] >= 5) & (df["sugars"] < 10), "Medium Sugar")
-    .otherwise("High Sugar")
+    "partition_category",
+    when(rand() < 0.5, "Partition_1").otherwise("Partition_2")
 )
 
-sugar_partitioned_df = df.repartition(3, "sugar_category")
+name_partitioned_df = df.repartition(2, "partition_category") 
 
-print(f"Number of partitions (Sugar Partitioning): {sugar_partitioned_df.rdd.getNumPartitions()}")
-for i in range(sugar_partitioned_df.rdd.getNumPartitions()):
+print(f"Number of partitions (name): {name_partitioned_df.rdd.getNumPartitions()}")
+for i in range(name_partitioned_df.rdd.getNumPartitions()):
     print(f"Partition {i}:")
-    partition_data = sugar_partitioned_df.rdd.mapPartitionsWithIndex(lambda index, it: it if index == i else []).collect()
+    # Get data for the current partition as a DataFrame
+    partition_data = name_partitioned_df.rdd.mapPartitionsWithIndex(lambda index, it: it if index == i else [])
+    # Create a DataFrame from the partition data
+    partition_df = spark.createDataFrame(partition_data, df.schema)
     # TRANSFORMATION PIPELINE
-    partition_data.groupBy("sugar_category").max("calories").show()
-    partition_data.groupBy("sugar_category").avg("rating").show()
-
-
-
-
-
+    # Now you can use groupBy on the DataFrame
+    partition_df.groupBy("mfr").max("calories").show()
+    partition_df.groupBy("mfr").avg("rating").show()
